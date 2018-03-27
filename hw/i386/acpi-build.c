@@ -1687,6 +1687,32 @@ static void build_q35_pci0_int(Aml *table)
     aml_append(table, sb_scope);
 }
 
+static void build_static_pci0_prt(Aml *table)
+{
+    int i, j;
+    Aml *method, *res, *pkg;
+    Aml *sb_scope = aml_scope("_SB");
+    Aml *pci0_scope = aml_scope("PCI0");
+
+    method = aml_method("_PRT", 0, AML_NOTSERIALIZED);
+    res = aml_package(128);
+    for (i = 0; i < 32; i++) {
+        for (j = 0; j < 4; j++) {
+            pkg = aml_package(4);
+            aml_append(pkg, aml_int((i << 16) | 0xffff));
+            aml_append(pkg, aml_int(j));
+            aml_append(pkg, aml_int(0));
+            aml_append(pkg, aml_int(0x14 + ((i + j) % 4)));
+            aml_append(res, pkg);
+        }
+    }
+
+    aml_append(method, aml_return(res));
+    aml_append(pci0_scope, method);
+    aml_append(sb_scope, pci0_scope);
+    aml_append(table, sb_scope);
+}
+
 static void build_q35_isa_bridge(Aml *table)
 {
     Aml *dev;
@@ -1894,7 +1920,11 @@ build_dsdt(GArray *table_data, BIOSLinker *linker,
         build_piix4_isa_bridge(dsdt);
         build_isa_devices_aml(dsdt);
         build_piix4_pci_hotplug(dsdt);
-        build_piix4_pci0_int(dsdt);
+        if (pcms->static_prt) {
+            build_static_pci0_prt(dsdt);
+        } else {
+            build_piix4_pci0_int(dsdt);
+        }
     } else {
         sb_scope = aml_scope("_SB");
         dev = aml_device("PCI0");
