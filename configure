@@ -323,6 +323,7 @@ vhost_net="no"
 vhost_scsi="no"
 vhost_vsock="no"
 vhost_user=""
+vhost_9p="no"
 kvm="no"
 hax="no"
 rdma=""
@@ -789,6 +790,7 @@ Linux)
   vhost_net="yes"
   vhost_scsi="yes"
   vhost_vsock="yes"
+  vhost_9p="yes"
   QEMU_INCLUDES="-I\$(SRC_PATH)/linux-headers -I$(pwd)/linux-headers $QEMU_INCLUDES"
   supported_os="yes"
 ;;
@@ -1152,6 +1154,10 @@ for opt do
   --disable-vhost-vsock) vhost_vsock="no"
   ;;
   --enable-vhost-vsock) vhost_vsock="yes"
+  ;;
+  --disable-vhost-9p) vhost_9p="no"
+  ;;
+  --enable-vhost-9p) vhost_9p="yes"
   ;;
   --disable-opengl) opengl="no"
   ;;
@@ -5544,6 +5550,7 @@ echo "vhost-net support $vhost_net"
 echo "vhost-scsi support $vhost_scsi"
 echo "vhost-vsock support $vhost_vsock"
 echo "vhost-user support $vhost_user"
+echo "vhost-9p support $vhost_9p"
 echo "Trace backends    $trace_backends"
 if have_backend "simple"; then
 echo "Trace output file $trace_file-<pid>"
@@ -5981,6 +5988,9 @@ if test "$vhost_vsock" = "yes" ; then
 fi
 if test "$vhost_user" = "yes" ; then
   echo "CONFIG_VHOST_USER=y" >> $config_host_mak
+fi
+if test "$vhost_9p" = "yes" ; then
+  echo "CONFIG_VHOST_9P=y" >> $config_host_mak
 fi
 if test "$blobs" = "yes" ; then
   echo "INSTALL_BLOBS=yes" >> $config_host_mak
