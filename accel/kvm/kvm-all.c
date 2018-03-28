@@ -2128,6 +2128,11 @@ bool kvm_has_sync_mmu(void)
     return kvm_state->sync_mmu;
 }
 
+int kvm_need_vapic(void)
+{
+    return kvm_check_extension(kvm_state, KVM_CAP_VAPIC);
+}
+
 int kvm_has_vcpu_events(void)
 {
     return kvm_state->vcpu_events;
