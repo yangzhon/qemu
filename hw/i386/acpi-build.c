@@ -1939,7 +1939,11 @@ build_dsdt(GArray *table_data, BIOSLinker *linker,
         build_hpet_aml(dsdt);
         build_q35_isa_bridge(dsdt);
         build_isa_devices_aml(dsdt);
-        build_q35_pci0_int(dsdt);
+        if (pcms->static_prt) {
+            build_static_pci0_prt(dsdt);
+        } else {
+            build_q35_pci0_int(dsdt);
+        }
     }
 
     if (pcmc->legacy_cpu_hotplug) {
