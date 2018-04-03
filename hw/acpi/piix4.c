@@ -52,6 +52,9 @@
 
 #define GPE_BASE 0xafe0
 #define GPE_LEN 4
+#define PIIX_PMBASE 0x40
+#define PIIX_PMREGMISC 0x80
+#define ACPI_PM_BASE 0x600
 
 struct pci_status {
     uint32_t up; /* deprecated, maintained for migration compatibility */
@@ -345,6 +348,7 @@ static void piix4_reset(void *opaque)
 {
     PIIX4PMState *s = opaque;
     PCIDevice *d = PCI_DEVICE(s);
+    PCMachineState *pcms = PC_MACHINE(qdev_get_machine());
     uint8_t *pci_conf = d->config;
 
     pci_conf[0x58] = 0;
@@ -359,6 +363,14 @@ static void piix4_reset(void *opaque)
         /* Mark SMM as already inited (until KVM supports SMM). */
         pci_conf[0x5B] = 0x02;
     }
+
+    if (!pcms->fw_cfg) {
+        /*set the pm base in qemu side*/
+        pci_set_long(d->config + PIIX_PMBASE, ACPI_PM_BASE | 0x01);
+        /* enable PM io space */
+        pci_set_byte(d->config + PIIX_PMREGMISC, 0x01);
+    }
+
     pm_io_space_update(s);
     acpi_pcihp_reset(&s->acpi_pci_hotplug);
 }
@@ -491,6 +503,7 @@ static void piix4_pm_add_propeties(PIIX4PMState *s)
 static void piix4_pm_realize(PCIDevice *dev, Error **errp)
 {
     PIIX4PMState *s = PIIX4_PM(dev);
+    PCMachineState *pcms = PC_MACHINE(qdev_get_machine());
     uint8_t *pci_conf;
 
     pci_conf = dev->config;
@@ -533,7 +546,12 @@ static void piix4_pm_realize(PCIDevice *dev, Error **errp)
 
     s->machine_ready.notify = piix4_pm_machine_ready;
     qemu_add_machine_init_done_notifier(&s->machine_ready);
-    qemu_register_reset(piix4_reset, s);
+
+    if (pcms->fw_cfg) {
+        qemu_register_reset(piix4_reset, s);
+    } else {
+        piix4_reset(s);
+    }
 
     piix4_acpi_system_hot_add_init(pci_address_space_io(dev), dev->bus, s);
 
