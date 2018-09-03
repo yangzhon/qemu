@@ -2467,7 +2467,7 @@ static void pc_machine_initfn(Object *obj)
     pcms->smbus = true;
     pcms->sata = true;
     pcms->pit = true;
-    pcms->static_prt = true;
+    pcms->static_prt = false;
     pcms->fw = true;
 }
 
