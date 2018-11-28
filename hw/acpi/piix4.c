@@ -344,11 +344,17 @@ static const VMStateDescription vmstate_acpi = {
     }
 };
 
+static void piix4_reset_nofw(void *opaque)
+{
+    PIIX4PMState *s = opaque;
+
+    acpi_pcihp_reset(&s->acpi_pci_hotplug);
+}
+
 static void piix4_reset(void *opaque)
 {
     PIIX4PMState *s = opaque;
     PCIDevice *d = PCI_DEVICE(s);
-    PCMachineState *pcms = PC_MACHINE(qdev_get_machine());
     uint8_t *pci_conf = d->config;
 
     pci_conf[0x58] = 0;
@@ -362,13 +368,6 @@ static void piix4_reset(void *opaque)
     if (!s->smm_enabled) {
         /* Mark SMM as already inited (until KVM supports SMM). */
         pci_conf[0x5B] = 0x02;
-    }
-
-    if (!pcms->fw_cfg) {
-        /*set the pm base in qemu side*/
-        pci_set_long(d->config + PIIX_PMBASE, ACPI_PM_BASE | 0x01);
-        /* enable PM io space */
-        pci_set_byte(d->config + PIIX_PMREGMISC, 0x01);
     }
 
     pm_io_space_update(s);
@@ -503,6 +502,7 @@ static void piix4_pm_add_propeties(PIIX4PMState *s)
 static void piix4_pm_realize(PCIDevice *dev, Error **errp)
 {
     PIIX4PMState *s = PIIX4_PM(dev);
+    PCIDevice *d = PCI_DEVICE(s);
     PCMachineState *pcms = PC_MACHINE(qdev_get_machine());
     uint8_t *pci_conf;
 
@@ -550,7 +550,13 @@ static void piix4_pm_realize(PCIDevice *dev, Error **errp)
     if (pcms->fw_cfg) {
         qemu_register_reset(piix4_reset, s);
     } else {
-        piix4_reset(s);
+        /*set the pm base in qemu side*/
+        pci_set_long(d->config + PIIX_PMBASE, ACPI_PM_BASE | 0x01);
+        /* enable PM io space */
+        pci_set_byte(d->config + PIIX_PMREGMISC, 0x01);
+
+        pm_io_space_update(s);
+        qemu_register_reset(piix4_reset_nofw, s);
     }
 
     piix4_acpi_system_hot_add_init(pci_address_space_io(dev), dev->bus, s);
