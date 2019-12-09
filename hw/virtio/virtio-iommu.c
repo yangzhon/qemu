@@ -116,10 +116,10 @@ static void virtio_iommu_notify_unmap(IOMMUMemoryRegion *mr, hwaddr iova,
 static gboolean virtio_iommu_mapping_unmap(gpointer key, gpointer value,
                                            gpointer data)
 {
-    viommu_mapping *mapping = (viommu_mapping *) value;
+    viommu_interval *interval = (viommu_interval *) key;
     IOMMUMemoryRegion *mr = (IOMMUMemoryRegion *) data;
 
-    virtio_iommu_notify_unmap(mr, mapping->virt_addr, mapping->size);
+    virtio_iommu_notify_unmap(mr, interval->low, interval->high - interval->low + 1);
 
     return false;
 }
@@ -127,11 +127,12 @@ static gboolean virtio_iommu_mapping_unmap(gpointer key, gpointer value,
 static gboolean virtio_iommu_mapping_map(gpointer key, gpointer value,
                                          gpointer data)
 {
+    viommu_interval *interval = (viommu_interval *) key;
     viommu_mapping *mapping = (viommu_mapping *) value;
     IOMMUMemoryRegion *mr = (IOMMUMemoryRegion *) data;
 
-    virtio_iommu_notify_map(mr, mapping->virt_addr, mapping->phys_addr,
-                            mapping->size);
+    virtio_iommu_notify_map(mr, interval->low, mapping->phys_addr,
+                            interval->high - interval->low + 1);
 
     return false;
 }
@@ -361,7 +362,7 @@ static int virtio_iommu_map(VirtIOIOMMU *s,
             sid = virtio_iommu_get_sid(node->iommu_dev);
             if (ep->id == sid) {
                 virtio_iommu_notify_map(&node->iommu_dev->iommu_mr,
-                                        virt_start, phys_start, mapping->size);
+                                        virt_start, phys_start, virt_end - virt_start + 1);
             }
         }
     }
@@ -814,16 +815,17 @@ static gint int_cmp(gconstpointer a, gconstpointer b, gpointer user_data)
 
 static gboolean virtio_iommu_remap(gpointer key, gpointer value, gpointer data)
 {
+    viommu_interval *interval = (viommu_interval *) key;
     viommu_mapping *mapping = (viommu_mapping *) value;
     IOMMUMemoryRegion *mr = (IOMMUMemoryRegion *) data;
 
-    trace_virtio_iommu_remap(mapping->virt_addr, mapping->phys_addr,
-                             mapping->size);
+    trace_virtio_iommu_remap(interval->low, mapping->phys_addr,
+                             interval->high - interval->low + 1);
     /* unmap previous entry and map again */
-    virtio_iommu_notify_unmap(mr, mapping->virt_addr, mapping->size);
+    virtio_iommu_notify_unmap(mr, interval->low, interval->high - interval->low + 1);
 
-    virtio_iommu_notify_map(mr, mapping->virt_addr, mapping->phys_addr,
-                            mapping->size);
+    virtio_iommu_notify_map(mr, interval->low, mapping->phys_addr,
+                            interval->high - interval->low + 1);
     return false;
 }
 
