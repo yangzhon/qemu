@@ -113,8 +113,44 @@ static void virtio_iommu_notify_unmap(IOMMUMemoryRegion *mr, hwaddr iova,
     memory_region_notify_iommu(mr, 0, entry);
 }
 
+static gboolean virtio_iommu_mapping_unmap(gpointer key, gpointer value,
+                                           gpointer data)
+{
+    viommu_mapping *mapping = (viommu_mapping *) value;
+    IOMMUMemoryRegion *mr = (IOMMUMemoryRegion *) data;
+
+    virtio_iommu_notify_unmap(mr, mapping->virt_addr, mapping->size);
+
+    return false;
+}
+
+static gboolean virtio_iommu_mapping_map(gpointer key, gpointer value,
+                                         gpointer data)
+{
+    viommu_mapping *mapping = (viommu_mapping *) value;
+    IOMMUMemoryRegion *mr = (IOMMUMemoryRegion *) data;
+
+    virtio_iommu_notify_map(mr, mapping->virt_addr, mapping->phys_addr,
+                            mapping->size);
+
+    return false;
+}
+
 static void virtio_iommu_detach_endpoint_from_domain(viommu_endpoint *ep)
 {
+    VirtioIOMMUNotifierNode *node;
+    VirtIOIOMMU *s = ep->viommu;
+    viommu_domain *domain = ep->domain;
+    uint32_t sid;
+
+    QLIST_FOREACH(node, &s->notifiers_list, next) {
+        sid = virtio_iommu_get_sid(node->iommu_dev);
+        if (ep->id == sid) {
+            g_tree_foreach(domain->mappings, virtio_iommu_mapping_unmap,
+                           &node->iommu_dev->iommu_mr);
+        }
+    }
+
     QLIST_REMOVE(ep, next);
     g_tree_unref(ep->domain->mappings);
     ep->domain = NULL;
@@ -224,8 +260,10 @@ static int virtio_iommu_attach(VirtIOIOMMU *s,
 {
     uint32_t domain_id = le32_to_cpu(req->domain);
     uint32_t ep_id = le32_to_cpu(req->endpoint);
+    VirtioIOMMUNotifierNode *node;
     viommu_domain *domain;
     viommu_endpoint *ep;
+    uint32_t sid;
 
     trace_virtio_iommu_attach(domain_id, ep_id);
 
@@ -243,6 +281,15 @@ static int virtio_iommu_attach(VirtIOIOMMU *s,
 
     ep->domain = domain;
     g_tree_ref(domain->mappings);
+
+    /* replay existing address space mappings on the associated mr */
+    QLIST_FOREACH(node, &s->notifiers_list, next) {
+        sid = virtio_iommu_get_sid(node->iommu_dev);
+        if (ep->id == sid) {
+            g_tree_foreach(domain->mappings, virtio_iommu_mapping_map,
+                           &node->iommu_dev->iommu_mr);
+        }
+    }
 
     return VIRTIO_IOMMU_S_OK;
 }
