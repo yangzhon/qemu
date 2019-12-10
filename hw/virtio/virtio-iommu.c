@@ -50,6 +50,7 @@ typedef struct viommu_endpoint {
     uint32_t id;
     viommu_domain *domain;
     QLIST_ENTRY(viommu_endpoint) next;
+    VirtIOIOMMU *viommu;
 } viommu_endpoint;
 
 typedef struct viommu_interval {
@@ -168,6 +169,7 @@ static viommu_endpoint *virtio_iommu_get_endpoint(VirtIOIOMMU *s,
     }
     ep = g_malloc0(sizeof(*ep));
     ep->id = ep_id;
+    ep->viommu = s;
     trace_virtio_iommu_get_endpoint(ep_id);
     g_tree_insert(s->endpoints, GUINT_TO_POINTER(ep_id), ep);
     return ep;
