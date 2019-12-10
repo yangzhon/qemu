@@ -851,9 +851,10 @@ unlock:
     qemu_mutex_unlock(&s->mutex);
 }
 
-static void virtio_iommu_notify_flag_changed(IOMMUMemoryRegion *iommu_mr,
+static int virtio_iommu_notify_flag_changed(IOMMUMemoryRegion *iommu_mr,
                                              IOMMUNotifierFlag old,
-                                             IOMMUNotifierFlag new)
+                                             IOMMUNotifierFlag new,
+                                             Error **errp)
 {
     IOMMUDevice *sdev = container_of(iommu_mr, IOMMUDevice, iommu_mr);
     VirtIOIOMMU *s = sdev->viommu;
@@ -865,7 +866,7 @@ static void virtio_iommu_notify_flag_changed(IOMMUMemoryRegion *iommu_mr,
         node = g_malloc0(sizeof(*node));
         node->iommu_dev = sdev;
         QLIST_INSERT_HEAD(&s->notifiers_list, node, next);
-        return;
+        return 0;
     }
 
     /* update notifier node with new flags */
@@ -876,9 +877,9 @@ static void virtio_iommu_notify_flag_changed(IOMMUMemoryRegion *iommu_mr,
                 QLIST_REMOVE(node, next);
                 g_free(node);
             }
-            return;
         }
     }
+    return 0;
 }
 
 static void virtio_iommu_device_realize(DeviceState *dev, Error **errp)
