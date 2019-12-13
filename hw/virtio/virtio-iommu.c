@@ -332,7 +332,6 @@ static int virtio_iommu_map(VirtIOIOMMU *s,
     viommu_domain *domain;
     viommu_interval *interval;
     viommu_mapping *mapping;
-    uint32_t sid;
 
     interval = g_malloc0(sizeof(*interval));
 
@@ -361,8 +360,7 @@ static int virtio_iommu_map(VirtIOIOMMU *s,
     /* All devices in an address-space share mapping */
     QLIST_FOREACH(node, &s->notifiers_list, next) {
         QLIST_FOREACH(ep, &domain->endpoint_list, next) {
-            sid = virtio_iommu_get_sid(node->iommu_dev);
-            if (ep->id == sid) {
+            if (ep->id == node->iommu_dev->devfn) {
                 virtio_iommu_notify_map(&node->iommu_dev->iommu_mr,
                                         virt_start, phys_start, virt_end - virt_start + 1);
             }
@@ -377,16 +375,14 @@ static void virtio_iommu_remove_mapping(VirtIOIOMMU *s, viommu_domain *domain,
 {
     VirtioIOMMUNotifierNode *node;
     viommu_endpoint *ep;
-    uint32_t sid;
+    uint64_t iova = interval->low;
+    uint64_t size = interval->high - interval->low + 1;
 
     g_tree_remove(domain->mappings, (gpointer)(interval));
     QLIST_FOREACH(node, &s->notifiers_list, next) {
         QLIST_FOREACH(ep, &domain->endpoint_list, next) {
-            sid = virtio_iommu_get_sid(node->iommu_dev);
-            if (ep->id == sid) {
-                virtio_iommu_notify_unmap(&node->iommu_dev->iommu_mr,
-                                          interval->low,
-                                          interval->high - interval->low + 1);
+            if (ep->id == node->iommu_dev->devfn) {
+                virtio_iommu_notify_unmap(&node->iommu_dev->iommu_mr, iova, size);
             }
         }
     }
